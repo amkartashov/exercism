@@ -3,5 +3,6 @@
         "rust/hello-world/Cargo.toml",
         "rust/reverse-string/Cargo.toml",
         "rust/leap/Cargo.toml",
+        "rust/raindrops/Cargo.toml",
     ],
 }
