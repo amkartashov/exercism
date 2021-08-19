@@ -1,7 +1,9 @@
 [dependencies]
+unicode-segmentation = { version = "1.8.0", optional = true }
 
 [features]
-grapheme = []
+default = ["grapheme"]
+grapheme = ["unicode-segmentation"]
 
 [package]
 edition = "2018"
