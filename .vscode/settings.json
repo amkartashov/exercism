@@ -9,5 +9,6 @@
         "rust/proverb/Cargo.toml",
         "rust/difference-of-squares/Cargo.toml",
         "rust/sum-of-multiples/Cargo.toml",
+        "rust/grains/Cargo.toml",
     ],
 }
