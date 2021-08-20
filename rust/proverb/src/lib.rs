@@ -1,18 +1,11 @@
 pub fn build_proverb(list: &[&str]) -> String {
-    if list.is_empty() {
-        return String::new();
-    }
-
-    let first = list[0];
-    let rest = &list[1..];
-
-    let mut result = list
-        .iter()
-        .zip(rest.iter())
-        .map(|(&f, &s)| format!("For want of a {} the {} was lost.", f, s))
-        .collect::<Vec<_>>();
-
-    result.push(format!("And all for the want of a {}.", first));
-
-    result.join("\n")
+    list.windows(2)
+        .map(|win| format!("For want of a {} the {} was lost.", win[0], win[1]))
+        .chain(
+            list.first()
+                .iter()
+                .map(|&&s| format!("And all for the want of a {}.", s)),
+        )
+        .collect::<Vec<_>>()
+        .join("\n")
 }
