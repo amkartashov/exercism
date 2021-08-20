@@ -8,5 +8,6 @@
         "rust/beer-song/Cargo.toml",
         "rust/proverb/Cargo.toml",
         "rust/difference-of-squares/Cargo.toml",
+        "rust/sum-of-multiples/Cargo.toml",
     ],
 }
