@@ -11,5 +11,6 @@
         "rust/sum-of-multiples/Cargo.toml",
         "rust/grains/Cargo.toml",
         "rust/prime-factors/Cargo.toml",
+        "rust/armstrong-numbers/Cargo.toml",
     ],
 }
