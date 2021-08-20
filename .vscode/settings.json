@@ -10,5 +10,6 @@
         "rust/difference-of-squares/Cargo.toml",
         "rust/sum-of-multiples/Cargo.toml",
         "rust/grains/Cargo.toml",
+        "rust/prime-factors/Cargo.toml",
     ],
 }
