@@ -4,5 +4,6 @@
         "rust/reverse-string/Cargo.toml",
         "rust/leap/Cargo.toml",
         "rust/raindrops/Cargo.toml",
+        "rust/nth-prime/Cargo.toml",
     ],
 }

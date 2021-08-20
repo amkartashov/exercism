@@ -1,0 +1,13 @@
+[package]
+edition = "2018"
+name = "nth_prime"
+version = "2.1.0"
+
+[dependencies]
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "primes"
+harness = false
