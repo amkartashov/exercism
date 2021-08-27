@@ -13,5 +13,6 @@
         "rust/prime-factors/Cargo.toml",
         "rust/armstrong-numbers/Cargo.toml",
         "rust/gigasecond/Cargo.toml",
+        "rust/clock/Cargo.toml",
     ],
 }
