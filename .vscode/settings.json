@@ -26,5 +26,6 @@
         "rust/anagram/Cargo.toml",
         "rust/space-age/Cargo.toml",
         "rust/sublist/Cargo.toml",
+        "rust/minesweeper/Cargo.toml",
     ],
 }
