@@ -21,5 +21,6 @@
         "rust/low-power-embedded-game/Cargo.toml",
         "rust/role-playing-game/Cargo.toml",
         "rust/magazine-cutout/Cargo.toml",
+        "rust/short-fibonacci/Cargo.toml",
     ],
 }
