@@ -14,5 +14,6 @@
         "rust/armstrong-numbers/Cargo.toml",
         "rust/gigasecond/Cargo.toml",
         "rust/clock/Cargo.toml",
+        "rust/lucians-luscious-lasagna/Cargo.toml",
     ],
 }
