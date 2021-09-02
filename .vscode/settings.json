@@ -17,5 +17,9 @@
         "rust/lucians-luscious-lasagna/Cargo.toml",
         "rust/semi-structured-logs/Cargo.toml",
         "rust/assembly-line/Cargo.toml",
+        "rust/health-statistics/Cargo.toml",
+        "rust/low-power-embedded-game/Cargo.toml",
+        "rust/role-playing-game/Cargo.toml",
+        "rust/magazine-cutout/Cargo.toml",
     ],
 }
