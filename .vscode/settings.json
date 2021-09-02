@@ -23,5 +23,6 @@
         "rust/magazine-cutout/Cargo.toml",
         "rust/short-fibonacci/Cargo.toml",
         "rust/rpn-calculator/Cargo.toml",
+        "rust/anagram/Cargo.toml",
     ],
 }
