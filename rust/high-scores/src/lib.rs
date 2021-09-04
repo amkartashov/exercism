@@ -1,3 +1,5 @@
+use std::{cmp::Reverse, collections::BinaryHeap};
+
 #[derive(Debug)]
 pub struct HighScores {
     scores: Vec<u32>,
@@ -23,22 +25,18 @@ impl HighScores {
     }
 
     fn topn(&self, n: usize) -> Vec<u32> {
-        if n == 0 || self.scores.len() == 0 {
-            return Vec::new();
-        }
-
-        let mut topn: Vec<_> = self.scores.iter().copied().take(n).collect();
-        topn.sort_unstable();
+        let mut topn: BinaryHeap<_> = self.scores.iter().copied().take(n).map(Reverse).collect();
 
         for &score in self.scores.iter().skip(n) {
-            // compare with the lowest score from the top and replace it
-            if score > topn[0] {
-                topn[0] = score;
-                topn.sort_unstable();
-            }
+            topn.push(Reverse(score));
+            topn.pop();
         }
 
+        let mut topn = topn.into_iter().map(|r| r.0).collect::<Vec<_>>();
+
+        topn.sort_unstable();
         topn.reverse();
+
         topn
     }
 
