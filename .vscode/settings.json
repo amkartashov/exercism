@@ -31,5 +31,6 @@
         "rust/luhn/Cargo.toml",
         "rust/parallel-letter-frequency/Cargo.toml",
         "rust/high-scores/Cargo.toml",
+        "rust/matching-brackets/Cargo.toml",
     ],
 }
