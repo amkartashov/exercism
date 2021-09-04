@@ -29,5 +29,6 @@
         "rust/minesweeper/Cargo.toml",
         "rust/bob/Cargo.toml",
         "rust/luhn/Cargo.toml",
+        "rust/parallel-letter-frequency/Cargo.toml",
     ],
 }
