@@ -23,15 +23,25 @@ impl HighScores {
     }
 
     fn topn(&self, n: usize) -> Vec<u32> {
-        let mut topn: Vec<_> = self.scores.iter().copied().take(n).collect();
+        if n == 0 || self.scores.len() == 0 {
+            return Vec::new();
+        }
 
+        let mut topn: Vec<_> = self.scores.iter().copied().take(n).collect();
         // use sort_by to sort in descending order
         topn.sort_unstable_by(|a, b| b.cmp(a));
 
+        // link to the lowest of the top
+        let last: *mut u32 = topn.last_mut().unwrap();
+
         for &score in self.scores.iter().skip(n) {
-            topn.push(score);
-            topn.sort_unstable_by(|a, b| b.cmp(a));
-            topn.pop();
+            // this is safe to unreference the pointer
+            // because sort_unstable_by does in-place sorting, without allocation
+            // so topn underlying memory is not moved.
+            if unsafe { score > *last } {
+                unsafe { *last = score };
+                topn.sort_unstable_by(|a, b| b.cmp(a));
+            }
         }
 
         topn
