@@ -33,5 +33,6 @@
         "rust/high-scores/Cargo.toml",
         "rust/matching-brackets/Cargo.toml",
         "rust/acronym/Cargo.toml",
+        "rust/all-your-base/Cargo.toml",
     ],
 }
