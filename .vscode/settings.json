@@ -35,5 +35,6 @@
         "rust/acronym/Cargo.toml",
         "rust/all-your-base/Cargo.toml",
         "rust/allergies/Cargo.toml",
+        "rust/alphametics/Cargo.toml",
     ],
 }
