@@ -1,73 +1,180 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::mem::swap;
 
 pub fn solve(input: &str) -> Option<HashMap<char, u8>> {
     let puzzle = AlphameticPuzzle::from(input);
-    puzzle.find_solution()
+    puzzle.find_solution2()
 }
 
 #[derive(Clone, Debug)]
 struct AlphameticPuzzle {
-    addends: AlphameticNumber,
+    leading_letters: HashSet<char>,
+    even_letters: HashSet<char>,
+    summands: AlphameticNumbersSum,
     sum: AlphameticNumber,
     letters: Vec<char>,
 }
 
 impl AlphameticPuzzle {
     fn from(expression: &str) -> Self {
-        // "AA + BB + DD == CC" -> "AA + BB + DD ", " CC"
-        let mut split_by_eq = expression.split("==");
+        // "AA + BB + DD == CC" -> "AA", "BB", "DD", "CC"
+        let mut numbers = expression
+            .split(|c: char| !c.is_alphabetic())
+            .filter(|&str| str.len() > 0)
+            .map(|str| str.chars().into_iter().rev().collect::<Vec<_>>())
+            .collect::<Vec<_>>();
 
-        AlphameticPuzzle {
-            addends: split_by_eq
-                .next()
-                .unwrap()
-                .split('+')
-                .map(|number| AlphameticNumber::from(number.trim()))
-                .fold(AlphameticNumber::new(), |mut a, b| {
-                    a += b;
-                    a
-                }),
-            sum: AlphameticNumber::from(split_by_eq.next().unwrap().trim()),
-            letters: AlphameticPuzzle::letters(expression),
+        let maxlen = numbers.iter().map(|str| str.len()).max().unwrap();
+
+        let mut unique_letters = HashSet::new();
+        let mut letters = Vec::new();
+        let mut leading_letters = HashSet::new();
+
+        // we enumberate letters starting from units column
+        // so to fail (later) on wrong permutation earlier
+        for idx in 0..maxlen {
+            for num in &numbers {
+                if let Some(letter) = num.get(idx) {
+                    if !unique_letters.contains(letter) {
+                        unique_letters.insert(*letter);
+                        letters.push(*letter);
+                    }
+                }
+            }
         }
+
+        // find all first letters
+        // later we will use them for discarding permutations
+        // with leading zeroes
+        for num in &numbers {
+            leading_letters.insert(num.last().copied().unwrap());
+        }
+
+        // separate the last number as sum
+        let sum_number = numbers.pop().unwrap();
+        let sum = AlphameticNumber::from(sum_number);
+
+        // prepare summands
+        let mut summands = AlphameticNumbersSum::new();
+        for num in numbers {
+            let num = AlphameticNumber::from(num);
+            summands += num;
+        }
+
+        // find all letters which are supposed to be even
+        let mut even_letters = HashSet::new();
+
+        for (idx, letters_count) in summands.letters_count.iter().enumerate() {
+            if letters_count.iter().all(|(_, &count)| count % 2 == 0) {
+                even_letters.insert(sum.letters[idx]);
+            }
+        }
+
+        summands.convert_to_columns();
+
+        dbg!(AlphameticPuzzle {
+            leading_letters,
+            even_letters,
+            summands,
+            sum,
+            letters,
+        })
     }
 
-    fn find_solution(&self) -> Option<HashMap<char, u8>> {
-        let mut permutations = DigitPermutations::new(self.letters.len() as u8);
+    fn find_solution2(&self) -> Option<HashMap<char, u8>> {
+        let mut solution = HashMap::with_capacity(self.letters.len());
+        let mut used_digits = HashSet::with_capacity(self.letters.len());
 
-        while let Some(permutation) = permutations.next() {
-            let solution = self
-                .letters
-                .iter()
-                .copied()
-                .zip(permutation.iter().copied())
-                .collect();
+        self.find_solution2_recursive(&mut solution, &mut used_digits)
+    }
 
-            if self.test_solution(&solution) {
+    fn find_solution2_recursive(
+        &self,
+        solution: &mut HashMap<char, u8>,
+        used_digits: &mut HashSet<u8>,
+    ) -> Option<HashMap<char, u8>> {
+        if solution.len() >= self.letters.len() {
+            if self.test_solution(solution) {
+                return Some(solution.clone());
+            } else {
+                return None;
+            }
+        }
+
+        let letter = self.letters[solution.len()];
+
+        for digit in 0..10u8 {
+            if used_digits.contains(&digit) {
+                continue;
+            }
+
+            if digit == 0 && self.leading_letters.contains(&letter) {
+                continue;
+            }
+
+            if digit % 2 == 1 && self.even_letters.contains(&letter) {
+                continue;
+            }
+
+            solution.insert(letter, digit);
+            used_digits.insert(digit);
+
+            if !self.find_solution2_partial_test_ok(solution) {
+                solution.remove(&letter);
+                used_digits.remove(&digit);
+                continue;
+            }
+
+            if let Some(solution) = self.find_solution2_recursive(solution, used_digits) {
                 return Some(solution);
             }
+
+            solution.remove(&letter);
+            used_digits.remove(&digit);
         }
 
         None
     }
 
-    fn test_solution(&self, solution: &HashMap<char, u8>) -> bool {
-        if let (Some(sum), Some(addends)) = (self.sum.value(solution), self.addends.value(solution))
-        {
-            sum == addends
-        } else {
-            false
+    fn find_solution2_partial_test_ok(&self, solution: &HashMap<char, u8>) -> bool {
+        let mut shift = 0;
+
+        for idx in 0..self.sum.letters.len() {
+            if let Some(&sum) = solution.get(&self.sum.letters[idx]) {
+                if idx == self.summands.letters_count.len() {
+                    if sum > idx as u8 {
+                        return false;
+                    }
+                    return true;
+                }
+
+                let mut rhs_sum = 0;
+
+                for (letter, count) in self.summands.letters_columns[idx].iter() {
+                    if let Some(&letter_value) = solution.get(letter) {
+                        rhs_sum += *count as u64 * letter_value as u64;
+                    } else {
+                        return true;
+                    }
+                }
+
+                rhs_sum += shift;
+
+                if (sum % 10) != (rhs_sum % 10) as u8 {
+                    return false; ///////   This is what we looking for to eliminate unwanted permutation
+                }
+
+                shift = rhs_sum / 10;
+            } else {
+                return true;
+            }
         }
+
+        return true;
     }
 
-    fn letters(expression: &str) -> Vec<char> {
-        let mut letters = HashSet::new();
-        for c in expression.chars().filter(|&c| c.is_alphabetic()) {
-            letters.insert(c);
-        }
-        letters.iter().copied().collect()
+    fn test_solution(&self, solution: &HashMap<char, u8>) -> bool {
+        self.sum.value(solution) == self.summands.value(solution)
     }
 }
 
@@ -75,144 +182,74 @@ impl AlphameticPuzzle {
 struct AlphameticNumber {
     // can be single number or sum of numbers
     // ABC ->
-    //      first_digits: (A)
-    //      number: [(C->1), (B->1), (A->1)]
-    // ABC + AED + CBBB ->
-    //      first_digits: (A, C)
-    //      number: [(B->1,C->1,D->1), (B->2,E->1), (A->2,B->1), (C->1)]
-    first_digits: HashSet<char>,
-    number: Vec<HashMap<char, u8>>,
+    //      letters: [C, B, A]
+    letters: Vec<char>,
 }
 
 impl AlphameticNumber {
-    fn new() -> Self {
-        AlphameticNumber::from(&"")
+    fn from(letters: Vec<char>) -> Self {
+        AlphameticNumber { letters }
     }
 
-    fn from(string: &str) -> Self {
-        let mut first_digits = HashSet::new();
-        if let Some(first) = string.chars().next() {
-            first_digits.insert(first);
-        }
-        let mut number = Vec::new();
-        for c in string.chars().rev() {
-            let mut c_map = HashMap::new();
-            c_map.insert(c, 1);
-            number.push(c_map);
+    fn value(&self, solution: &HashMap<char, u8>) -> u64 {
+        let mut sum = 0;
+
+        for l in self.letters.iter().rev() {
+            let val = *solution.get(l).unwrap() as u64;
+            sum *= 10;
+            sum += val;
         }
 
-        AlphameticNumber {
-            first_digits,
-            number,
-        }
-    }
-
-    fn value(&self, solution: &HashMap<char, u8>) -> Option<u64> {
-        // no leading zeroes are allowed
-        for digit in &self.first_digits {
-            if solution.get(&digit) == Some(&0) {
-                return None;
-            }
-        }
-
-        let mut tens = 1;
-
-        Some(
-            self.number
-                .iter()
-                .map(|cn| {
-                    let mut sum = 0;
-                    for (c, &n) in cn {
-                        let c = *solution.get(&c).unwrap();
-                        sum += (n as u64) * (c as u64);
-                    }
-                    sum *= tens;
-                    tens *= 10;
-
-                    sum
-                })
-                .sum(),
-        )
+        sum
     }
 }
 
-impl std::ops::AddAssign<Self> for AlphameticNumber {
-    fn add_assign(&mut self, mut rhs: Self) {
-        if self.first_digits.len() < rhs.first_digits.len() {
-            swap(&mut self.first_digits, &mut rhs.first_digits)
-        }
-        for digit in rhs.first_digits {
-            self.first_digits.insert(digit);
-        }
-
-        if self.number.len() < rhs.number.len() {
-            swap(&mut self.number, &mut rhs.number)
-        }
-
-        for (self_cn, rhs_cn) in self.number.iter_mut().zip(rhs.number.iter_mut()) {
-            if self_cn.len() < rhs_cn.len() {
-                swap(self_cn, rhs_cn)
-            }
-            for (&letter, count) in rhs_cn {
-                let entry = self_cn.entry(letter).or_default();
-                *entry += *count
-            }
-        }
-    }
-}
-
-/// quasi-iterator other all possible permutations of n unique digits (0 to 9)
 #[derive(Clone, Debug)]
-struct DigitPermutations {
-    n: u8,
-    state: Vec<u8>,
+struct AlphameticNumbersSum {
+    // ABC + AED + CBBB ->
+    // [(B->1,C->1,D->1), (B->2,E->1), (A->2,B->1), (C->1)]
+    letters_count: Vec<HashMap<char, u8>>,
+    letters_columns: Vec<Vec<(char, u8)>>,
 }
 
-impl DigitPermutations {
-    fn new(n: u8) -> Self {
+impl AlphameticNumbersSum {
+    fn new() -> Self {
         Self {
-            n,
-            state: Vec::with_capacity(n as usize),
+            letters_count: Vec::new(),
+            letters_columns: Vec::new(),
         }
     }
 
-    fn next(&mut self) -> Option<&Vec<u8>> {
-        if self.state.is_empty() {
-            if self.n == 0 || self.n > 10 {
-                return None;
-            }
-            // we start with 0,1,2,3,...
-            self.state.extend(0..self.n);
-            return Some(&self.state);
+    fn convert_to_columns(&mut self) {
+        for lc in &self.letters_count {
+            let mut l_c_vec = Vec::new();
+            l_c_vec.extend(lc.clone());
+            self.letters_columns.push(l_c_vec);
         }
+    }
 
-        let mut increased_flag = false;
+    fn value(&self, solution: &HashMap<char, u8>) -> u64 {
+        let mut sum = 0;
 
-        // We iterate over all permutations by trying to increase the latest digits first, that's why rev() is here
-        for idx in (0..self.n as usize).rev() {
-            let current_digit = self.state[idx];
-            // we choose the next possible digit for current[idx] which is not already in use in current[0..idx]
-            if let Some(next_digit) = ((current_digit + 1)..=9)
-                .filter(|&digit| (0..idx).all(|i| self.state[i] != digit))
-                .next()
-            {
-                self.state[idx] = next_digit;
-                // reset digits after this position (idx) anew
-                for i in (idx + 1)..self.n as usize {
-                    self.state[i] = (0..=9)
-                        .filter(|&digit| (0..i).all(|j| self.state[j] != digit))
-                        .next()
-                        .unwrap()
-                }
-                increased_flag = true;
-                break;
-            }
+        for lc in self.letters_columns.iter().rev() {
+            sum *= 10;
+            sum += lc
+                .iter()
+                .map(|(letter, count)| (*solution.get(letter).unwrap() as u64) * (*count as u64))
+                .sum::<u64>();
         }
-        // if we were not able to increase, this means that we reached maximum 9,8,7,6,..
-        if !increased_flag {
-            return None;
-        } else {
-            return Some(&self.state);
+        sum
+    }
+}
+
+impl std::ops::AddAssign<AlphameticNumber> for AlphameticNumbersSum {
+    fn add_assign(&mut self, rhs: AlphameticNumber) {
+        if rhs.letters.len() > self.letters_count.len() {
+            self.letters_count.resize(rhs.letters.len(), HashMap::new());
+        }
+        for (idx, rhs_letter) in rhs.letters.iter().enumerate() {
+            let entry = self.letters_count[idx].entry(*rhs_letter).or_default();
+            *entry += 1;
         }
     }
 }
