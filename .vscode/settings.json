@@ -40,5 +40,6 @@
         "rust/bowling/Cargo.toml",
         "rust/dot-dsl/Cargo.toml",
         "rust/etl/Cargo.toml",
+        "rust/grade-school/Cargo.toml",
     ],
 }
