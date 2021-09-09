@@ -37,5 +37,6 @@
         "rust/allergies/Cargo.toml",
         "rust/alphametics/Cargo.toml",
         "rust/binary-search/Cargo.toml",
+        "rust/bowling/Cargo.toml",
     ],
 }
