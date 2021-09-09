@@ -45,5 +45,6 @@
         "rust/isbn-verifier/Cargo.toml",
         "rust/isogram/Cargo.toml",
         "rust/nucleotide-count/Cargo.toml",
+        "rust/diffie-hellman/Cargo.toml",
     ],
 }
