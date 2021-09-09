@@ -43,5 +43,6 @@
         "rust/grade-school/Cargo.toml",
         "rust/hamming/Cargo.toml",
         "rust/isbn-verifier/Cargo.toml",
+        "rust/isogram/Cargo.toml",
     ],
 }
