@@ -39,5 +39,6 @@
         "rust/binary-search/Cargo.toml",
         "rust/bowling/Cargo.toml",
         "rust/dot-dsl/Cargo.toml",
+        "rust/etl/Cargo.toml",
     ],
 }

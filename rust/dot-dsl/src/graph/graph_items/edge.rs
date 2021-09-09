@@ -17,6 +17,16 @@ impl Edge {
     }
 
     pub fn with_attrs(self, attrs: &[(&str, &str)]) -> Self {
-        self
+        Self {
+            attrs: attrs
+                .iter()
+                .map(|(s1, s2)| (s1.to_string(), s2.to_string()))
+                .collect(),
+            ..self
+        }
+    }
+
+    pub fn get_attr(&self, key: &str) -> Option<&str> {
+        self.attrs.get(key).map(String::as_str)
     }
 }

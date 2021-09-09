@@ -18,19 +18,35 @@ pub mod graph {
         }
 
         pub fn get_node(&self, name: &str) -> Option<Node> {
-            None
+            self.nodes.iter().find(|n| n.name == name).cloned()
         }
 
         pub fn with_nodes(self, nodes: &[Node]) -> Self {
-            self
+            Self {
+                nodes: nodes.iter().cloned().collect(),
+                ..self
+            }
         }
 
         pub fn with_edges(self, edges: &[Edge]) -> Self {
-            self
+            Self {
+                edges: edges.iter().cloned().collect(),
+                ..self
+            }
         }
 
         pub fn with_attrs(self, attrs: &[(&str, &str)]) -> Self {
-            self
+            Self {
+                attrs: attrs
+                    .iter()
+                    .map(|(s1, s2)| (s1.to_string(), s2.to_string()))
+                    .collect(),
+                ..self
+            }
+        }
+
+        pub fn get_attr(&self, key: &str) -> Option<&str> {
+            self.attrs.get(key).map(String::as_str)
         }
     }
 
