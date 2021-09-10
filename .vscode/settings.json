@@ -46,5 +46,6 @@
         "rust/isogram/Cargo.toml",
         "rust/nucleotide-count/Cargo.toml",
         "rust/diffie-hellman/Cargo.toml",
+        "rust/palindrome-products/Cargo.toml",
     ],
 }
