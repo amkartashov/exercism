@@ -48,5 +48,6 @@
         "rust/diffie-hellman/Cargo.toml",
         "rust/palindrome-products/Cargo.toml",
         "rust/pig-latin/Cargo.toml",
+        "rust/macros/Cargo.toml",
     ],
 }
