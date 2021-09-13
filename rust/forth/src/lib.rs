@@ -11,13 +11,13 @@ pub enum Error {
 
 #[derive(Debug)]
 pub struct Forth {
-    env: env::Env,
+    env: Env,
     stack: Vec<Value>,
 }
 
 impl Forth {
     pub fn new() -> Forth {
-        let mut env = env::Env::new();
+        let mut env = Env::new();
         env.add_word("+".to_string(), vec![Plus]).ok();
         env.add_word("-".to_string(), vec![Minus]).ok();
         env.add_word("*".to_string(), vec![Mul]).ok();
@@ -94,6 +94,7 @@ impl Forth {
     }
 }
 
+use env::Env;
 mod env {
     use super::Error;
     use super::Result;
@@ -198,97 +199,106 @@ mod env {
     }
 }
 
-use Token::*;
-#[derive(Debug, PartialEq, Clone)]
-enum Token {
-    Colon,
-    Semicolon,
-    Plus,
-    Minus,
-    Mul,
-    Div,
-    Dup,
-    Drop,
-    Swap,
-    Over,
-    ValueToken(Value),
-    WordToken(String),
-}
+use token::Token;
+use token::Token::*;
+mod token {
 
-impl Token {
-    fn from_str(s: &str) -> Self {
-        if let Ok(val) = s.parse::<Value>() {
-            ValueToken(val)
-        } else {
-            match s {
-                ":" => Colon,
-                ";" => Semicolon,
-                s => WordToken(s.to_lowercase()),
-            }
-        }
+    use super::Error;
+    use super::Result;
+    use super::Value;
+    use Token::*;
+
+    #[derive(Debug, PartialEq, Clone)]
+    pub enum Token {
+        Colon,
+        Semicolon,
+        Plus,
+        Minus,
+        Mul,
+        Div,
+        Dup,
+        Drop,
+        Swap,
+        Over,
+        ValueToken(Value),
+        WordToken(String),
     }
 
-    fn word(self) -> Result<String> {
-        match self {
-            WordToken(word) => Ok(word),
-            _ => Err(Error::InvalidWord),
-        }
-    }
-
-    // eval any token except for Word, Colon, Semicolon
-    fn eval(&self, stack: &mut Vec<Value>) -> Result<()> {
-        fn pop(stack: &mut Vec<Value>) -> Result<Value> {
-            Ok(stack.pop().ok_or(Error::StackUnderflow)?)
-        }
-        match self {
-            Plus => {
-                let x2 = pop(stack)?;
-                let x1 = pop(stack)?;
-                stack.push(x1 + x2);
-            }
-            Minus => {
-                let x2 = pop(stack)?;
-                let x1 = pop(stack)?;
-                stack.push(x1 - x2);
-            }
-            Mul => {
-                let x2 = pop(stack)?;
-                let x1 = pop(stack)?;
-                stack.push(x1 * x2);
-            }
-            Div => {
-                let x2 = pop(stack)?;
-                if x2 == 0 {
-                    return Err(Error::DivisionByZero);
+    impl Token {
+        pub fn from_str(s: &str) -> Self {
+            if let Ok(val) = s.parse::<Value>() {
+                ValueToken(val)
+            } else {
+                match s {
+                    ":" => Colon,
+                    ";" => Semicolon,
+                    s => WordToken(s.to_lowercase()),
                 }
-                let x1 = pop(stack)?;
-                stack.push(x1 / x2);
             }
-            Dup => {
-                let x = pop(stack)?;
-                stack.push(x);
-                stack.push(x);
-            }
-            Drop => {
-                pop(stack)?;
-            }
-            Swap => {
-                let x2 = pop(stack)?;
-                let x1 = pop(stack)?;
-                stack.push(x2);
-                stack.push(x1);
-            }
-            Over => {
-                let x2 = pop(stack)?;
-                let x1 = pop(stack)?;
-                stack.push(x1);
-                stack.push(x2);
-                stack.push(x1);
-            }
-            ValueToken(val) => stack.push(*val),
-            _ => unimplemented!(),
         }
 
-        Ok(())
+        pub fn word(self) -> Result<String> {
+            match self {
+                WordToken(word) => Ok(word),
+                _ => Err(Error::InvalidWord),
+            }
+        }
+
+        // eval any token except for Word, Colon, Semicolon
+        pub fn eval(&self, stack: &mut Vec<Value>) -> Result<()> {
+            fn pop(stack: &mut Vec<Value>) -> Result<Value> {
+                Ok(stack.pop().ok_or(Error::StackUnderflow)?)
+            }
+            match self {
+                Plus => {
+                    let x2 = pop(stack)?;
+                    let x1 = pop(stack)?;
+                    stack.push(x1 + x2);
+                }
+                Minus => {
+                    let x2 = pop(stack)?;
+                    let x1 = pop(stack)?;
+                    stack.push(x1 - x2);
+                }
+                Mul => {
+                    let x2 = pop(stack)?;
+                    let x1 = pop(stack)?;
+                    stack.push(x1 * x2);
+                }
+                Div => {
+                    let x2 = pop(stack)?;
+                    if x2 == 0 {
+                        return Err(Error::DivisionByZero);
+                    }
+                    let x1 = pop(stack)?;
+                    stack.push(x1 / x2);
+                }
+                Dup => {
+                    let x = pop(stack)?;
+                    stack.push(x);
+                    stack.push(x);
+                }
+                Drop => {
+                    pop(stack)?;
+                }
+                Swap => {
+                    let x2 = pop(stack)?;
+                    let x1 = pop(stack)?;
+                    stack.push(x2);
+                    stack.push(x1);
+                }
+                Over => {
+                    let x2 = pop(stack)?;
+                    let x1 = pop(stack)?;
+                    stack.push(x1);
+                    stack.push(x2);
+                    stack.push(x1);
+                }
+                ValueToken(val) => stack.push(*val),
+                _ => unimplemented!(),
+            }
+
+            Ok(())
+        }
     }
 }
