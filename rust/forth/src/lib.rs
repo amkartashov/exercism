@@ -1,5 +1,4 @@
 pub type Value = i32;
-pub type Word = String;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
@@ -8,65 +7,28 @@ pub enum Error {
     StackUnderflow,
     UnknownWord,
     InvalidWord,
-    WrongExpression,
 }
 
 #[derive(Debug)]
 pub struct Forth {
-    words: Vec<WordDef>,
+    env: env::Env,
     stack: Vec<Value>,
 }
 
 impl Forth {
-    fn pop(&mut self) -> Result<Value> {
-        Ok(self.stack.pop().ok_or(Error::StackUnderflow)?)
-    }
-
-    fn word_pos(&self, name: &str, env_pos: usize) -> Option<usize> {
-        self.words
-            .iter()
-            .rev()
-            .skip(env_pos)
-            .position(|w| w.name == name)
-            .map(|p| p + env_pos + 1)
-    }
-
     pub fn new() -> Forth {
+        let mut env = env::Env::new();
+        env.add_word("+".to_string(), vec![Plus]).ok();
+        env.add_word("-".to_string(), vec![Minus]).ok();
+        env.add_word("*".to_string(), vec![Mul]).ok();
+        env.add_word("/".to_string(), vec![Div]).ok();
+        env.add_word("dup".to_string(), vec![Dup]).ok();
+        env.add_word("drop".to_string(), vec![Drop]).ok();
+        env.add_word("swap".to_string(), vec![Swap]).ok();
+        env.add_word("over".to_string(), vec![Over]).ok();
+
         Self {
-            words: vec![
-                WordDef {
-                    name: "+".to_string(),
-                    def: vec![Plus],
-                },
-                WordDef {
-                    name: "-".to_string(),
-                    def: vec![Minus],
-                },
-                WordDef {
-                    name: "*".to_string(),
-                    def: vec![Mul],
-                },
-                WordDef {
-                    name: "/".to_string(),
-                    def: vec![Div],
-                },
-                WordDef {
-                    name: "dup".to_string(),
-                    def: vec![Dup],
-                },
-                WordDef {
-                    name: "drop".to_string(),
-                    def: vec![Drop],
-                },
-                WordDef {
-                    name: "swap".to_string(),
-                    def: vec![Swap],
-                },
-                WordDef {
-                    name: "over".to_string(),
-                    def: vec![Over],
-                },
-            ],
+            env,
             stack: Vec::new(),
         }
     }
@@ -75,142 +37,166 @@ impl Forth {
         &self.stack
     }
 
-    fn eval_no_defs_tokens(&mut self, tokens: &[Token], env_pos: usize) -> Result<()> {
-        //dbg!(&tokens);
-        for t in tokens {
-            match t {
-                Plus => {
-                    let x2 = self.pop()?;
-                    let x1 = self.pop()?;
-                    self.stack.push(x1 + x2);
-                }
-                Minus => {
-                    let x2 = self.pop()?;
-                    let x1 = self.pop()?;
-                    self.stack.push(x1 - x2);
-                }
-                Mul => {
-                    let x2 = self.pop()?;
-                    let x1 = self.pop()?;
-                    self.stack.push(x1 * x2);
-                }
-                Div => {
-                    let x2 = self.pop()?;
-                    if x2 == 0 {
-                        return Err(Error::DivisionByZero);
-                    }
-                    let x1 = self.pop()?;
-                    self.stack.push(x1 / x2);
-                }
-                Dup => {
-                    let x = self.pop()?;
-                    self.stack.push(x);
-                    self.stack.push(x);
-                }
-                Drop => {
-                    dbg!(&self);
-                    self.pop()?;
-                }
-                Swap => {
-                    let x2 = self.pop()?;
-                    let x1 = self.pop()?;
-                    self.stack.push(x2);
-                    self.stack.push(x1);
-                }
-                Over => {
-                    let x2 = self.pop()?;
-                    let x1 = self.pop()?;
-                    self.stack.push(x1);
-                    self.stack.push(x2);
-                    self.stack.push(x1);
-                }
-                ValueToken(val) => self.stack.push(*val),
-                WordToken(word) => {
-                    let word_pos = self.word_pos(word, env_pos).ok_or(Error::UnknownWord)?;
-                    let word_tokens = self.words[self.words.len() - word_pos].def.clone();
-                    self.eval_no_defs_tokens(&word_tokens, word_pos)?;
-                }
-                _ => unimplemented!(),
-            }
-        }
-        Ok(())
-    }
-
     pub fn eval(&mut self, input: &str) -> Result<()> {
-        let mut tokens = input.split_ascii_whitespace().map(Token::from_str);
-
-        let mut inside_definition = false;
-
-        while let Some(t) = tokens.next() {
-            let t = t?;
-
-            if inside_definition {
-                let word_name = word_from_token(t)?;
-                let mut word_def = Vec::new();
-                while let Some(nt) = tokens.next() {
-                    let nt = nt?;
-                    if nt == Semicolon {
-                        inside_definition = false;
+        fn collect_word_definition(
+            tokens: &mut impl Iterator<Item = Token>,
+        ) -> Result<(String, Vec<Token>)> {
+            if let Some(word_token) = tokens.next() {
+                let word = word_token.word()?;
+                let mut definition_tokens = Vec::new();
+                let mut definition_is_malformed = true;
+                while let Some(token) = tokens.next() {
+                    if token == Semicolon {
+                        definition_is_malformed = false;
                         break;
                     }
-                    word_def.push(nt);
+                    definition_tokens.push(token);
                 }
-
-                for t in word_def.iter() {
-                    match t {
-                        WordToken(word) => {
-                            if self.word_pos(&word, 0).is_none() {
-                                return Err(Error::UnknownWord);
-                            }
-                        }
-                        // word def can't include other word def
-                        Colon => return Err(Error::WrongExpression),
-                        _ => {}
-                    }
+                if definition_is_malformed {
+                    Err(Error::InvalidWord)
+                } else {
+                    Ok((word, definition_tokens))
                 }
-                self.words.push(WordDef {
-                    name: dbg!(word_name),
-                    def: dbg!(word_def),
-                });
-
-                continue;
+            } else {
+                Err(Error::InvalidWord)
             }
+        }
 
-            match t {
+        let mut tokens = input.split_ascii_whitespace().map(Token::from_str);
+
+        while let Some(token) = tokens.next() {
+            match token {
+                // word definition started
                 Colon => {
-                    inside_definition = true;
+                    let (word, definition) = collect_word_definition(&mut tokens)?;
+                    self.env.add_word(word, definition)?;
                 }
-                Semicolon => return Err(Error::WrongExpression),
-                t => {
-                    let mut tokens_wo_defs = vec![t];
-                    while let Some(nt) = tokens.next() {
-                        let nt = nt?;
-                        if nt == Colon {
-                            inside_definition = true;
-                            break;
-                        }
-                        tokens_wo_defs.push(nt);
+
+                // closing semicolon is consumed by collect_word_definition(),
+                // so this must be standalone semicolon and this is a error
+                Semicolon => return Err(Error::InvalidWord),
+
+                // unfold word to simple tokens and evaluate each
+                WordToken(word) => {
+                    for token in self.env.word_tokens_iter(&word)? {
+                        token.eval(&mut self.stack)?
                     }
-                    self.eval_no_defs_tokens(&tokens_wo_defs, 0)?;
+                }
+
+                // this must be simple token which can be evaluated
+                _ => {
+                    token.eval(&mut self.stack)?;
                 }
             }
         }
 
-        if inside_definition {
-            Err(Error::InvalidWord)
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }
 
-#[derive(Debug)]
-struct WordDef {
-    name: Word,
-    def: Vec<Token>,
-}
+mod env {
+    use super::Error;
+    use super::Result;
+    use super::Token;
 
-use std::str::FromStr;
+    #[derive(Debug)]
+    struct WordDef {
+        name: String,
+        def: Vec<Token>,
+    }
+    #[derive(Debug)]
+    pub(crate) struct Env {
+        words: Vec<WordDef>,
+    }
+
+    impl Env {
+        pub fn new() -> Self {
+            Env { words: Vec::new() }
+        }
+
+        pub fn add_word(&mut self, word: String, tokens: Vec<Token>) -> Result<()> {
+            // verify that all word tokens refer to previously defined words
+            if !tokens.iter().all(|token| match token {
+                Token::WordToken(word) => self
+                    .words
+                    .iter()
+                    .position(|w| w.name == word.as_str())
+                    .is_some(),
+                _ => true,
+            }) {
+                Err(Error::UnknownWord)
+            } else {
+                self.words.push(WordDef {
+                    name: word,
+                    def: tokens,
+                });
+                Ok(())
+            }
+        }
+
+        pub fn word_tokens_iter(&self, word: &str) -> Result<WordTokensIterator> {
+            if self.words.iter().position(|w| w.name == word).is_some() {
+                Ok(WordTokensIterator::new(word, &self.words[..]))
+            } else {
+                Err(Error::UnknownWord)
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct WordTokensIterator<'a> {
+        env: &'a [WordDef],
+        tokens: core::slice::Iter<'a, Token>,
+        next_word_iterator: Option<Box<WordTokensIterator<'a>>>,
+    }
+
+    impl<'a> WordTokensIterator<'a> {
+        fn new(word: &'_ str, env: &'a [WordDef]) -> Self {
+            let word_pos = env.iter().rposition(|w| w.name == word).unwrap();
+            Self {
+                env: &env[..word_pos],
+                tokens: env[word_pos].def.iter(),
+                next_word_iterator: None,
+            }
+        }
+
+        fn next_from_tokens(&mut self) -> Option<&'a Token> {
+            if let Some(token) = self.tokens.next() {
+                match token {
+                    Token::WordToken(word) => {
+                        self.next_word_iterator =
+                            Some(Box::new(WordTokensIterator::new(word, self.env)));
+                        self.next_from_next_word()
+                    }
+                    _ => Some(token),
+                }
+            } else {
+                None
+            }
+        }
+
+        fn next_from_next_word(&mut self) -> Option<&'a Token> {
+            if let Some(token) = self.next_word_iterator.as_mut().unwrap().next() {
+                Some(token)
+            } else {
+                self.next_word_iterator = None;
+                self.next_from_tokens()
+            }
+        }
+    }
+
+    impl<'a> Iterator for WordTokensIterator<'a> {
+        type Item = &'a Token;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.next_word_iterator.is_some() {
+                self.next_from_next_word()
+            } else {
+                self.next_from_tokens()
+            }
+        }
+    }
+}
 
 use Token::*;
 #[derive(Debug, PartialEq, Clone)]
@@ -226,14 +212,12 @@ enum Token {
     Swap,
     Over,
     ValueToken(Value),
-    WordToken(Word),
+    WordToken(String),
 }
 
-impl FromStr for Token {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        Ok(if let Ok(val) = s.parse::<Value>() {
+impl Token {
+    fn from_str(s: &str) -> Self {
+        if let Ok(val) = s.parse::<Value>() {
             ValueToken(val)
         } else {
             match s {
@@ -241,15 +225,70 @@ impl FromStr for Token {
                 ";" => Semicolon,
                 s => WordToken(s.to_lowercase()),
             }
-        })
+        }
     }
-}
 
-//  "word is a sequence of one or more letters, digits, symbols or punctuation that is not a number"
-// now only checking for alphanumeric
-fn word_from_token(t: Token) -> Result<Word> {
-    match t {
-        WordToken(word) => Ok(word),
-        _ => Err(Error::InvalidWord),
+    fn word(self) -> Result<String> {
+        match self {
+            WordToken(word) => Ok(word),
+            _ => Err(Error::InvalidWord),
+        }
+    }
+
+    // eval any token except for Word, Colon, Semicolon
+    fn eval(&self, stack: &mut Vec<Value>) -> Result<()> {
+        fn pop(stack: &mut Vec<Value>) -> Result<Value> {
+            Ok(stack.pop().ok_or(Error::StackUnderflow)?)
+        }
+        match self {
+            Plus => {
+                let x2 = pop(stack)?;
+                let x1 = pop(stack)?;
+                stack.push(x1 + x2);
+            }
+            Minus => {
+                let x2 = pop(stack)?;
+                let x1 = pop(stack)?;
+                stack.push(x1 - x2);
+            }
+            Mul => {
+                let x2 = pop(stack)?;
+                let x1 = pop(stack)?;
+                stack.push(x1 * x2);
+            }
+            Div => {
+                let x2 = pop(stack)?;
+                if x2 == 0 {
+                    return Err(Error::DivisionByZero);
+                }
+                let x1 = pop(stack)?;
+                stack.push(x1 / x2);
+            }
+            Dup => {
+                let x = pop(stack)?;
+                stack.push(x);
+                stack.push(x);
+            }
+            Drop => {
+                pop(stack)?;
+            }
+            Swap => {
+                let x2 = pop(stack)?;
+                let x1 = pop(stack)?;
+                stack.push(x2);
+                stack.push(x1);
+            }
+            Over => {
+                let x2 = pop(stack)?;
+                let x1 = pop(stack)?;
+                stack.push(x1);
+                stack.push(x2);
+                stack.push(x1);
+            }
+            ValueToken(val) => stack.push(*val),
+            _ => unimplemented!(),
+        }
+
+        Ok(())
     }
 }
