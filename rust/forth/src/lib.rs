@@ -15,17 +15,23 @@ pub struct Forth {
     stack: Vec<Value>,
 }
 
+impl Default for Forth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Forth {
     pub fn new() -> Forth {
         let mut env = Env::new();
-        env.add_word("+".to_string(), vec![Plus]).ok();
-        env.add_word("-".to_string(), vec![Minus]).ok();
-        env.add_word("*".to_string(), vec![Mul]).ok();
-        env.add_word("/".to_string(), vec![Div]).ok();
-        env.add_word("dup".to_string(), vec![Dup]).ok();
-        env.add_word("drop".to_string(), vec![Drop]).ok();
-        env.add_word("swap".to_string(), vec![Swap]).ok();
-        env.add_word("over".to_string(), vec![Over]).ok();
+        env.add_word("+".to_string(), vec![Token::Plus]).ok();
+        env.add_word("-".to_string(), vec![Token::Minus]).ok();
+        env.add_word("*".to_string(), vec![Token::Mul]).ok();
+        env.add_word("/".to_string(), vec![Token::Div]).ok();
+        env.add_word("dup".to_string(), vec![Token::Dup]).ok();
+        env.add_word("drop".to_string(), vec![Token::Drop]).ok();
+        env.add_word("swap".to_string(), vec![Token::Swap]).ok();
+        env.add_word("over".to_string(), vec![Token::Over]).ok();
 
         Self {
             env,
@@ -45,8 +51,8 @@ impl Forth {
                 let word = word_token.word()?;
                 let mut definition_tokens = Vec::new();
                 let mut definition_is_malformed = true;
-                while let Some(token) = tokens.next() {
-                    if token == Semicolon {
+                for token in tokens {
+                    if token == Token::Semicolon {
                         definition_is_malformed = false;
                         break;
                     }
@@ -67,17 +73,17 @@ impl Forth {
         while let Some(token) = tokens.next() {
             match token {
                 // word definition started
-                Colon => {
+                Token::Colon => {
                     let (word, definition) = collect_word_definition(&mut tokens)?;
                     self.env.add_word(word, definition)?;
                 }
 
                 // closing semicolon is consumed by collect_word_definition(),
                 // so this must be standalone semicolon and this is a error
-                Semicolon => return Err(Error::InvalidWord),
+                Token::Semicolon => return Err(Error::InvalidWord),
 
                 // unfold word to simple tokens and evaluate each
-                WordToken(word) => {
+                Token::Word(word) => {
                     for token in self.env.word_tokens_iter(&word)? {
                         token.eval(&mut self.stack)?
                     }
@@ -117,26 +123,22 @@ mod env {
 
         pub fn add_word(&mut self, word: String, tokens: Vec<Token>) -> Result<()> {
             // verify that all word tokens refer to previously defined words
-            if !tokens.iter().all(|token| match token {
-                Token::WordToken(word) => self
-                    .words
-                    .iter()
-                    .position(|w| w.name == word.as_str())
-                    .is_some(),
+            if tokens.iter().all(|token| match token {
+                Token::Word(word) => self.words.iter().any(|w| w.name == word.as_str()),
                 _ => true,
             }) {
-                Err(Error::UnknownWord)
-            } else {
                 self.words.push(WordDef {
                     name: word,
                     def: tokens,
                 });
                 Ok(())
+            } else {
+                Err(Error::UnknownWord)
             }
         }
 
         pub fn word_tokens_iter(&self, word: &str) -> Result<WordTokensIterator> {
-            if self.words.iter().position(|w| w.name == word).is_some() {
+            if self.words.iter().any(|w| w.name == word) {
                 Ok(WordTokensIterator::new(word, &self.words[..]))
             } else {
                 Err(Error::UnknownWord)
@@ -164,7 +166,7 @@ mod env {
         fn next_from_tokens(&mut self) -> Option<&'a Token> {
             if let Some(token) = self.tokens.next() {
                 match token {
-                    Token::WordToken(word) => {
+                    Token::Word(word) => {
                         self.next_word_iterator =
                             Some(Box::new(WordTokensIterator::new(word, self.env)));
                         self.next_from_next_word()
@@ -200,7 +202,6 @@ mod env {
 }
 
 use token::Token;
-use token::Token::*;
 mod token {
 
     use super::Error;
@@ -220,26 +221,26 @@ mod token {
         Drop,
         Swap,
         Over,
-        ValueToken(Value),
-        WordToken(String),
+        ValueT(Value),
+        Word(String),
     }
 
     impl Token {
         pub fn from_str(s: &str) -> Self {
             if let Ok(val) = s.parse::<Value>() {
-                ValueToken(val)
+                ValueT(val)
             } else {
                 match s {
                     ":" => Colon,
                     ";" => Semicolon,
-                    s => WordToken(s.to_lowercase()),
+                    s => Word(s.to_lowercase()),
                 }
             }
         }
 
         pub fn word(self) -> Result<String> {
             match self {
-                WordToken(word) => Ok(word),
+                Word(word) => Ok(word),
                 _ => Err(Error::InvalidWord),
             }
         }
@@ -247,7 +248,7 @@ mod token {
         // eval any token except for Word, Colon, Semicolon
         pub fn eval(&self, stack: &mut Vec<Value>) -> Result<()> {
             fn pop(stack: &mut Vec<Value>) -> Result<Value> {
-                Ok(stack.pop().ok_or(Error::StackUnderflow)?)
+                stack.pop().ok_or(Error::StackUnderflow)
             }
             match self {
                 Plus => {
@@ -294,7 +295,7 @@ mod token {
                     stack.push(x2);
                     stack.push(x1);
                 }
-                ValueToken(val) => stack.push(*val),
+                ValueT(val) => stack.push(*val),
                 _ => unimplemented!(),
             }
 
